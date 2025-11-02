@@ -3,12 +3,19 @@
 Backend server for the review dashboard
 """
 from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS
 import json
 import os
 from pathlib import Path
 
 
-app = Flask(__name__, template_folder='templates', static_folder='static')
+# Point to the frontend folder for templates and static files
+app = Flask(__name__, 
+            template_folder='../frontend',
+            static_folder='../frontend')
+
+# Enable CORS for all routes
+CORS(app)
 
 # Default data paths
 DATA_DIR = os.getenv("DATA_DIR", "../../data")
@@ -49,17 +56,22 @@ def get_blocks():
     classified_blocks = load_json_file(CLASSIFIED_OUTPUT_PATH)
     review_state = load_json_file(REVIEW_STATE_PATH)
     
+    # Ensure review_state is a dict
+    if not isinstance(review_state, dict):
+        review_state = {}
+    
     # Combine raw and classified blocks with review status
-    for block in classified_blocks:
-        block_id = block.get('id')
-        if block_id and review_state.get(block_id):
-            block['review_status'] = review_state[block_id].get('status', 'pending')
-            block['reviewer'] = review_state[block_id].get('reviewer', '')
-            block['notes'] = review_state[block_id].get('notes', '')
-        else:
-            block['review_status'] = 'pending'
-            block['reviewer'] = ''
-            block['notes'] = ''
+    if isinstance(classified_blocks, list):
+        for block in classified_blocks:
+            block_id = block.get('id') if isinstance(block, dict) else None
+            if block_id and isinstance(review_state.get(block_id), dict):
+                block['review_status'] = review_state[block_id].get('status', 'pending')
+                block['reviewer'] = review_state[block_id].get('reviewer', '')
+                block['notes'] = review_state[block_id].get('notes', '')
+            else:
+                block['review_status'] = 'pending'
+                block['reviewer'] = ''
+                block['notes'] = ''
     
     return jsonify(classified_blocks)
 
@@ -68,12 +80,17 @@ def get_blocks():
 def update_block(block_id):
     """Update the review status of a specific block"""
     data = request.json
+    if not data or not isinstance(data, dict):
+        return jsonify({'error': 'Invalid request data'}), 400
+    
     review_status = data.get('review_status')
     reviewer = data.get('reviewer', '')
     notes = data.get('notes', '')
     
     # Load current review state
     review_state = load_json_file(REVIEW_STATE_PATH)
+    if not isinstance(review_state, dict):
+        review_state = {}
     
     # Update the specific block's review state
     review_state[block_id] = {
@@ -91,11 +108,16 @@ def update_block(block_id):
         classified_blocks = load_json_file(CLASSIFIED_OUTPUT_PATH)
         approved_blocks = load_json_file(APPROVED_OUTPUT_PATH)
         
+        # Ensure approved_blocks is a list
+        if not isinstance(approved_blocks, list):
+            approved_blocks = []
+        
         # Find the block to approve
-        block_to_approve = next((b for b in classified_blocks if b['id'] == block_id), None)
-        if block_to_approve and not any(b['id'] == block_id for b in approved_blocks):
-            approved_blocks.append(block_to_approve)
-            save_json_file(APPROVED_OUTPUT_PATH, approved_blocks)
+        if isinstance(classified_blocks, list):
+            block_to_approve = next((b for b in classified_blocks if isinstance(b, dict) and b.get('id') == block_id), None)
+            if block_to_approve and not any(isinstance(b, dict) and b.get('id') == block_id for b in approved_blocks):
+                approved_blocks.append(block_to_approve)
+                save_json_file(APPROVED_OUTPUT_PATH, approved_blocks)
     
     return jsonify({'status': 'success'})
 
@@ -104,6 +126,9 @@ def update_block(block_id):
 def export_approved():
     """Export approved content to various formats"""
     data = request.json
+    if not data or not isinstance(data, dict):
+        data = {}
+    
     format_type = data.get('format', 'json')
     approved_blocks = load_json_file(APPROVED_OUTPUT_PATH)
     

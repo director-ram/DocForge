@@ -51,15 +51,23 @@ def main():
     """
     Main function to extract images from PDF
     """
-    # Default paths
-    input_pdf = os.getenv("INPUT_PDF", "input.pdf")
-    output_dir = os.getenv("OUTPUT_DIR", "../data/images")
+    import sys
+    
+    # Parse command line arguments
+    if len(sys.argv) >= 3:
+        input_pdf = sys.argv[1]
+        output_dir = sys.argv[2]
+    else:
+        # Default paths
+        input_pdf = os.getenv("INPUT_PDF", "input.pdf")
+        output_dir = os.getenv("OUTPUT_DIR", "../data/images")
     
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
     
     if not os.path.exists(input_pdf):
         print(f"Error: Input PDF '{input_pdf}' not found")
+        print(f"Usage: python extract_images.py <pdf_file> <output_dir>")
         return
     
     print(f"Extracting images from {input_pdf} to {output_dir}")
